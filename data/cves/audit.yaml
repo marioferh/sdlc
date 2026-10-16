@@ -1,0 +1,2 @@
+# Append-only audit log of CVE actions (add, discard, accept, fix, triage, jira, ...).
+entries: []

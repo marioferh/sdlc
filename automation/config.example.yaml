@@ -22,18 +22,36 @@ email:
   digest_hour_local: 8
 
 cve:
-  # Severities included in the morning digest
   digest_severities:
     - CRITICAL
     - HIGH
     - MEDIUM
-  # Sources: osv, github_advisories, manual
   sources:
     - github_advisories
     - manual
+  auto_jira_on_critical: true
+  # SLA targets (hours) before a pending CVE is flagged
+  sla_hours:
+    CRITICAL: 48
+    HIGH: 168
+    MEDIUM: 720
+    LOW: 2160
+  release_gate:
+    enabled: true
+    block_severities:
+      - CRITICAL
+      - HIGH
+  policy:
+    require_four_eyes: true
+    four_eyes_severities:
+      - CRITICAL
+    restricted_discard_severities:
+      - CRITICAL
+    # Emails/usernames allowed to approve CRITICAL discard/accept
+    approvers:
+      - you@example.com
 
 libraries:
-  # Alert when Dependabot / manifests change these ecosystems
   ecosystems:
     - npm
     - pip

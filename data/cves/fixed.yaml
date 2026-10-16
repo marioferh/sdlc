@@ -1,0 +1,3 @@
+# Remediated CVEs.
+# python automation/scripts/cve_manage.py fix CVE-... --pr https://github.com/...
+items: []

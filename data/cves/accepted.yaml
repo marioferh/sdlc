@@ -1,0 +1,3 @@
+# Time-bounded risk acceptance (excluded from release gate until expiry).
+# python automation/scripts/cve_manage.py accept CVE-... --reason '...' --expires-days 30
+items: []
