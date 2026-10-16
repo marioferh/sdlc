@@ -13,6 +13,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.lib.config import load_config  # noqa: E402
 from scripts.lib import cve_store, email_client, github_client, jira_client  # noqa: E402
+from scripts.lib.policy import age_hours, sla_breached, sla_hours_for  # noqa: E402
+from scripts.lib.triage import suggest  # noqa: E402
 
 
 SEVERITY_MAP = {
@@ -24,7 +26,6 @@ SEVERITY_MAP = {
 
 
 def sync_github_advisories(cfg: dict) -> int:
-    """Pull open Dependabot alerts into pending (skip discarded)."""
     if "github_advisories" not in (cfg.get("cve") or {}).get("sources", []):
         return 0
     gh = github_client.GitHubClient()
@@ -40,8 +41,7 @@ def sync_github_advisories(cfg: dict) -> int:
             pkg = ((alert.get("dependency") or {}).get("package") or {}).get("name", "")
             sev = SEVERITY_MAP.get(str(advisory.get("severity", "")).lower(), "UNKNOWN")
             for cid in cve_ids:
-                before = cve_store.find_cve(str(cid))
-                if before:
+                if cve_store.find_cve(str(cid)):
                     continue
                 try:
                     cve_store.upsert_from_scanner(
@@ -60,24 +60,40 @@ def sync_github_advisories(cfg: dict) -> int:
     return added
 
 
-def build_body(items: list[dict], cfg: dict) -> str:
+def build_body(items: list[dict], cfg: dict, reinstated: int) -> str:
     tz = ZoneInfo((cfg.get("email") or {}).get("timezone") or "UTC")
     today = datetime.now(tz).strftime("%Y-%m-%d")
+    breached = [i for i in items if sla_breached(i)]
     lines = [
         f"SDLC morning CVE digest — {today}",
         "",
         f"Pending CVEs: {len(items)}",
+        f"SLA breaches: {len(breached)}",
+        f"Expired exceptions reinstated: {reinstated}",
         "",
     ]
+    if breached:
+        lines.append("## SLA breaches")
+        for item in breached:
+            limit = sla_hours_for(str(item.get("severity", "")))
+            lines.append(
+                f"- {item.get('id')} [{item.get('severity')}] "
+                f"age~{int(age_hours(item) or 0)}h (SLA {limit}h)"
+            )
+        lines.append("")
+
     if not items:
         lines.append("No pending CVEs matching digest severities. Good morning.")
         return "\n".join(lines)
 
+    lines.append("## Pending")
     for item in items:
+        triage = suggest(item)
         lines.append(
             f"- {item.get('id')} [{item.get('severity')}] "
             f"pkg={item.get('package') or '-'} repo={item.get('repository') or '-'} "
-            f"epic={item.get('epic') or '-'} source={item.get('source') or '-'}"
+            f"→ {triage['suggestion']} "
+            f"jira={item.get('jira_key') or '-'}"
         )
         if item.get("notes"):
             lines.append(f"    {item['notes']}")
@@ -86,8 +102,11 @@ def build_body(items: list[dict], cfg: dict) -> str:
             "",
             "Manage:",
             "  python automation/scripts/cve_manage.py list",
+            "  python automation/scripts/cve_triage.py",
+            "  python automation/scripts/cve_remediate.py CVE-XXXX",
             "  python automation/scripts/cve_manage.py discard CVE-XXXX --reason '...'",
-            "  python automation/scripts/cve_manage.py add CVE-XXXX --manual --severity HIGH",
+            "  python automation/scripts/cve_manage.py accept CVE-XXXX --reason '...' --expires-days 30",
+            "  python automation/scripts/release_gate.py",
             "",
         ]
     )
@@ -95,10 +114,10 @@ def build_body(items: list[dict], cfg: dict) -> str:
 
 
 def maybe_open_jira(items: list[dict], cfg: dict) -> None:
-    """Create a Jira task for CRITICAL items that have no epic link yet."""
     jira_cfg = cfg.get("jira") or {}
     project = jira_cfg.get("project_key")
-    if not project or not items:
+    auto = (cfg.get("cve") or {}).get("auto_jira_on_critical", True)
+    if not project or not items or not auto:
         return
     critical = [i for i in items if str(i.get("severity", "")).upper() == "CRITICAL" and not i.get("jira_key")]
     if not critical:
@@ -120,10 +139,14 @@ def maybe_open_jira(items: list[dict], cfg: dict) -> None:
                     }
                 ],
             },
+            "labels": ["cve", "security", "critical"],
         }
         try:
             created = client.create_issue(fields)
-            print(f"jira: created {created.get('key')} for {item['id']}")
+            key = created.get("key", "")
+            if key:
+                cve_store.set_jira_key(str(item["id"]), key, actor="digest")
+            print(f"jira: created {key} for {item['id']}")
         except Exception as exc:  # noqa: BLE001
             print(f"jira: skip {item['id']}: {exc}", file=sys.stderr)
 
@@ -137,6 +160,10 @@ def main() -> int:
     args = parser.parse_args()
 
     cfg = load_config()
+    reinstated = cve_store.expire_exceptions(actor="digest")
+    if reinstated:
+        print(f"reinstated {len(reinstated)} expired exception(s)")
+
     if not args.no_sync:
         n = sync_github_advisories(cfg)
         print(f"synced {n} new advisories from GitHub")
@@ -144,8 +171,9 @@ def main() -> int:
     severities = (cfg.get("cve") or {}).get("digest_severities") or ["CRITICAL", "HIGH", "MEDIUM"]
     items = cve_store.pending_for_digest(severities)
     prefix = (cfg.get("email") or {}).get("subject_prefix") or "[SDLC]"
-    subject = f"{prefix} CVE digest — {len(items)} pending"
-    body = build_body(items, cfg)
+    breached_n = sum(1 for i in items if sla_breached(i))
+    subject = f"{prefix} CVE digest — {len(items)} pending ({breached_n} SLA breach)"
+    body = build_body(items, cfg, len(reinstated))
 
     if args.dry_run or args.no_email:
         print(subject)
