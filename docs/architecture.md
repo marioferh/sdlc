@@ -5,24 +5,24 @@
 | Layer | Role |
 |-------|------|
 | `trackers/` | Human-readable definitions (Jira, CVEs, libraries, connections) |
-| `data/` | Machine state (`cves/*.yaml`, `libraries/baseline.yaml`) |
-| `automation/scripts/` | Clients (Jira, GitHub, SMTP) + CLIs |
-| `.github/workflows/` | Scheduled morning digest and library watch |
+| `data/cves/` | pending / accepted / discarded / fixed + audit log |
+| `data/libraries/` | dependency baselines |
+| `reports/` | generated CVE dashboard / metrics |
+| `automation/scripts/` | clients + CVE ops CLIs |
+| `.github/workflows/` | digest, library watch, weekly metrics |
 
-## Data flow
+## CVE data flow
 
 ```
-GitHub Dependabot ──► cve_digest / cve_store ──► pending.yaml
+Dependabot / manual add ──► pending.yaml
                               │
-                              ├──► morning email (MAIL_TO)
-                              └──► Jira Task (CRITICAL)
-
-GitHub SBOM/deps  ──► library_watch ──► baseline.yaml
-                              └──► email on version/new/removed deps
-
-Operator CLI      ──► cve_manage (add / discard / undiscard)
+                              ├── triage (fix|mitigate|accept|discard)
+                              ├── digest email (+ SLA breaches)
+                              ├── remediate → Jira Task + checklist
+                              ├── accept → accepted.yaml (expires)
+                              ├── discard → discarded.yaml
+                              └── fix → fixed.yaml
+                                        │
+release_gate ◄── blocks CRITICAL/HIGH still pending
+metrics/dashboard ◄── aging, MTTR, audit trail
 ```
-
-## Repositories
-
-List watched repos in `automation/config.yaml` → `github.repositories`.

@@ -14,6 +14,8 @@ See `trackers/connections.md` and `.env.example`.
 
 - GitHub Dependabot alerts (synced into CVE pending store)
 - Trivy / Grype / osv.dev (optional; feed via `cve_manage.py add`)
+- Release gate (`release_gate.py`) for CI/CD
+- Jira remediation tasks (`cve_remediate.py`)
 
 ## Optional
 

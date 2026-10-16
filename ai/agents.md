@@ -8,4 +8,4 @@ Tracks Jira and repositories.
 
 ## Security Agent
 Analyses CVEs and release readiness.
-Uses morning digest, discarded/manual CVE store, and library-change alerts.
+Uses digest, triage, accept/fix lifecycle, release gate, audit log, metrics, and library alerts.

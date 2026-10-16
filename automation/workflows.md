@@ -4,34 +4,42 @@
 Jira -> GitHub -> Security -> AI Summary
 
 ## CVE Watch
-Scanner / Dependabot -> `data/cves/pending.yaml` -> Epic -> Jira Ticket
+Scanner / Dependabot -> pending store -> triage -> Jira / fix / accept
 
 ## Morning CVE digest (email)
-1. Sync open Dependabot alerts from watched GitHub repos
-2. Filter out discarded CVEs
-3. Email pending CVEs to `MAIL_TO`
-4. Optionally open Jira tasks for CRITICAL items
+1. Expire accepted/discarded exceptions past `expires_at`
+2. Sync Dependabot alerts
+3. Email pending CVEs + SLA breaches + triage hints
+4. Optionally open Jira for CRITICAL
 
 ```bash
 python automation/scripts/cve_digest.py
 ```
 
-CI: `.github/workflows/daily-cve-digest.yml` (daily ~08:00 Europe/Madrid)
+CI: `.github/workflows/daily-cve-digest.yml`
 
-## CVE triage
-- Discard: `cve_manage.py discard CVE-… --reason '…'`
-- Add manual: `cve_manage.py add CVE-… --manual --severity HIGH`
-- Undiscard: `cve_manage.py undiscard CVE-…`
+## Triage & remediation
+```bash
+python automation/scripts/cve_triage.py --apply
+python automation/scripts/cve_remediate.py CVE-XXXX
+```
+
+## Release gate
+```bash
+python automation/scripts/release_gate.py   # exit 2 if blocking CVEs
+```
+
+## Metrics
+```bash
+python automation/scripts/cve_metrics.py --write --email
+```
+
+CI: `.github/workflows/weekly-cve-metrics.yml`
 
 ## Library change alerts
-Compare GitHub dependency graph / SBOM against `data/libraries/baseline.yaml`, email diffs.
-
 ```bash
-python automation/scripts/library_watch.py --init   # once
-python automation/scripts/library_watch.py          # alert on changes
+python automation/scripts/library_watch.py --init
+python automation/scripts/library_watch.py
 ```
 
 CI: `.github/workflows/library-watch.yml`
-
-## Daily Report
-Jira + GitHub + CVEs -> Markdown report
