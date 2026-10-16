@@ -1,0 +1,3 @@
+# Manually added CVEs (not from scanners).
+# Add with: python automation/scripts/cve_manage.py add --manual ...
+items: []

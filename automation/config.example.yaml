@@ -1,0 +1,45 @@
+# Copy to automation/config.yaml and fill in non-secret values.
+# Secrets live in .env (see .env.example).
+
+jira:
+  project_key: SDLC
+  epic_link_field: customfield_10014
+  statuses_open:
+    - To Do
+    - In Progress
+    - Blocked
+
+github:
+  # Repositories watched for CVEs and library changes
+  repositories:
+    - owner: your-org
+      name: your-repo
+      default_branch: main
+
+email:
+  subject_prefix: "[SDLC]"
+  timezone: Europe/Madrid
+  digest_hour_local: 8
+
+cve:
+  # Severities included in the morning digest
+  digest_severities:
+    - CRITICAL
+    - HIGH
+    - MEDIUM
+  # Sources: osv, github_advisories, manual
+  sources:
+    - github_advisories
+    - manual
+
+libraries:
+  # Alert when Dependabot / manifests change these ecosystems
+  ecosystems:
+    - npm
+    - pip
+    - go
+    - maven
+  notify_on:
+    - version_bump
+    - new_dependency
+    - removed_dependency

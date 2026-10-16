@@ -1,0 +1,3 @@
+# Discarded CVEs (false positives, not applicable, accepted risk).
+# Re-add with: python automation/scripts/cve_manage.py add ...
+items: []

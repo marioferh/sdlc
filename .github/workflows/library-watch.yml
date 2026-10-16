@@ -1,0 +1,52 @@
+name: Library watch
+
+on:
+  schedule:
+    # Twice daily: 08:00 and 16:00 UTC
+    - cron: "0 8,16 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r automation/requirements.txt
+
+      - name: Prepare config
+        run: |
+          if [ ! -f automation/config.yaml ]; then
+            cp automation/config.example.yaml automation/config.yaml
+          fi
+
+      - name: Detect library changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+        run: python automation/scripts/library_watch.py
+
+      - name: Commit baseline updates
+        run: |
+          git config user.name "sdlc-bot"
+          git config user.email "sdlc-bot@users.noreply.github.com"
+          git add data/libraries/baseline.yaml || true
+          if git diff --staged --quiet; then
+            echo "No baseline changes"
+          else
+            git commit -m "chore(libraries): update dependency baseline"
+            git push
+          fi

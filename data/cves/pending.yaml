@@ -1,0 +1,4 @@
+# Pending CVEs awaiting triage or mitigation.
+# Managed by: automation/scripts/cve_manage.py
+# Morning digest: automation/scripts/cve_digest.py
+items: []

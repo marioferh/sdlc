@@ -1,0 +1,20 @@
+# Secrets and local config
+.env
+automation/config.yaml
+*.pem
+*.key
+
+# Runtime / generated
+data/cves/.lock
+data/libraries/snapshots/
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
